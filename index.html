@@ -249,7 +249,7 @@ function dibujar() {
 
 video.addEventListener("playing", () => {
   clearTimeout(vigilante);
-  if (aviso.textContent.startsWith("El canal no empezó")) mostrarAviso("");
+  if (/^(El canal no empezó|Reintentando)/.test(aviso.textContent)) mostrarAviso("");
 });
 video.addEventListener("error", () => {
   if (!hls || !video.error) return;
@@ -333,13 +333,34 @@ function reproducir(c, forzarProxy) {
     $("diag").textContent = "Formato: " + info + " | " + tecnico;
   }, 15000);
 
-  if (window.Hls && Hls.isSupported()) {
+  const nativoOk = !!video.canPlayType("application/vnd.apple.mpegurl");
+  const esApple = /Apple/i.test(navigator.vendor || "");
+  const usarNativo = () => {
+    if (hls) { hls.destroy(); hls = null; }
+    $("diag").textContent = "Reproductor nativo del sistema";
+    video.onerror = () => fallo("nativo");
+    video.onloadedmetadata = funciono;
+    video.src = fuente;
+    video.play().catch(() => {});
+  };
+
+  if (nativoOk && esApple) {
+    usarNativo();
+  } else if (window.Hls && Hls.isSupported()) {
     const h = new Hls({ capLevelToPlayerSize: true });
     hls = h;
     let intentosMedia = 0;
     h.on(Hls.Events.FRAG_LOADED, () => { est.frag++; });
     h.on(Hls.Events.ERROR, (_, d) => {
       if (actual === c && est.incidencias.length < 4 && !est.incidencias.includes(d.details)) est.incidencias.push(d.details);
+      if (d.details === "manifestIncompatibleCodecsError" && actual === c) {
+        if (nativoOk) { mostrarAviso("Reintentando con el reproductor del sistema..."); usarNativo(); }
+        else {
+          clearTimeout(vigilante);
+          mostrarAviso("Este canal solo ofrece video HEVC (H.265) y este navegador no puede reproducirlo. Funciona en iPhone, iPad o Mac con Safari.");
+        }
+        return;
+      }
       if (!d.fatal || actual !== c) return;
       if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
         const http = d.response && d.response.code ? " HTTP " + d.response.code : "";
@@ -347,6 +368,7 @@ function reproducir(c, forzarProxy) {
         fallo(d.details + http + rechazo);
       }
       else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && intentosMedia < 2) { intentosMedia++; h.recoverMediaError(); }
+      else if (nativoOk) { mostrarAviso("Reintentando con el reproductor del sistema..."); usarNativo(); }
       else mostrarAviso("Error al reproducir este canal. [" + d.details + "]");
     });
     h.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
@@ -361,11 +383,8 @@ function reproducir(c, forzarProxy) {
     });
     h.loadSource(fuente);
     h.attachMedia(video);
-  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.onerror = () => fallo();
-    video.onloadedmetadata = funciono;
-    video.src = fuente;
-    video.play().catch(() => {});
+  } else if (nativoOk) {
+    usarNativo();
   } else {
     mostrarAviso("Este navegador no soporta reproducción HLS.");
   }
