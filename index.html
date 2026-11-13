@@ -29,6 +29,7 @@
   #ovl { position:absolute; left:16px; top:16px; background:rgba(0,0,0,.65); padding:8px 14px; border-radius:8px; font-size:20px; font-weight:600; opacity:0; transition:opacity .3s; pointer-events:none; z-index:2; }
   #ovl.on { opacity:1; }
   #actual { font-size:18px; font-weight:600; }
+  #diag { font-size:12px; color:var(--mut); min-height:1em; word-break:break-word; }
 
   .side { background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
   .tools { padding:12px; display:flex; flex-direction:column; gap:8px; border-bottom:1px solid var(--line); }
@@ -98,6 +99,7 @@
       <div id="aviso"></div>
     </div>
     <div id="actual">Elige un canal</div>
+    <div id="diag"></div>
   </main>
 
   <aside class="side">
@@ -141,7 +143,7 @@ const RESPALDO = [
 
 const $ = id => document.getElementById(id);
 const video = $("video"), aviso = $("aviso"), wrap = $("wrap");
-let hls = null, actual = null, visibles = [], ovlTimer = null;
+let hls = null, actual = null, visibles = [], ovlTimer = null, vigilante = null;
 
 function leer(clave, def) { try { const v = JSON.parse(localStorage.getItem(clave)); return v ?? def; } catch (e) { return def; } }
 function guardar(clave, val) { try { localStorage.setItem(clave, JSON.stringify(val)); } catch (e) {} }
@@ -245,6 +247,15 @@ function dibujar() {
   });
 }
 
+video.addEventListener("playing", () => {
+  clearTimeout(vigilante);
+  if (aviso.textContent.startsWith("El canal no empezó")) mostrarAviso("");
+});
+video.addEventListener("error", () => {
+  if (!hls || !video.error) return;
+  mostrarAviso("El navegador no pudo decodificar el video [video " + video.error.code + "]. Puede ser un formato no soportado (por ejemplo 4K/HEVC).");
+});
+
 function mostrarAviso(msg) { aviso.textContent = msg; aviso.style.display = msg ? "block" : "none"; }
 
 function mostrarNombre(txt) {
@@ -263,7 +274,14 @@ function reproducir(c, forzarProxy) {
   mostrarNombre(c.nombre);
   mostrarAviso("");
   video.onerror = null;
+  clearTimeout(vigilante);
+  $("diag").textContent = "";
   if (hls) { hls.destroy(); hls = null; }
+
+  if (/\.mpd(\?|$)/i.test(c.url)) {
+    mostrarAviso("Este canal usa formato DASH (.mpd) y la página todavía no lo soporta.");
+    dibujar(); return;
+  }
 
   const esHttp = c.url.startsWith("http://");
   const necesitaHttps = location.protocol === "https:" && esHttp;
@@ -302,17 +320,36 @@ function reproducir(c, forzarProxy) {
     }
   };
 
+  let info = "";
+  vigilante = setTimeout(() => {
+    if (actual !== c || (!video.paused && video.readyState >= 3)) return;
+    mostrarAviso("El canal no empezó a reproducirse tras 15 segundos." + (info ? " Formato: " + info + "." : "") + (video.error ? " [video " + video.error.code + "]" : ""));
+  }, 15000);
+
   if (window.Hls && Hls.isSupported()) {
     const h = new Hls({ capLevelToPlayerSize: true });
     hls = h;
     let intentosMedia = 0;
     h.on(Hls.Events.ERROR, (_, d) => {
       if (!d.fatal || actual !== c) return;
-      if (d.type === Hls.ErrorTypes.NETWORK_ERROR) fallo(d.details + (d.response && d.response.code ? " HTTP " + d.response.code : ""));
+      if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        const http = d.response && d.response.code ? " HTTP " + d.response.code : "";
+        const rechazo = d.response && /Origen no permitido/.test(d.response.text || "") ? " rechazado por el proxy" : "";
+        fallo(d.details + http + rechazo);
+      }
       else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && intentosMedia < 2) { intentosMedia++; h.recoverMediaError(); }
       else mostrarAviso("Error al reproducir este canal. [" + d.details + "]");
     });
-    h.on(Hls.Events.MANIFEST_PARSED, () => { funciono(); video.play().catch(() => {}); });
+    h.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+      const ms = window.MediaSource;
+      info = (data.levels || []).map(l => {
+        const cod = l.videoCodec || "";
+        const ok = ms && cod ? ms.isTypeSupported('video/mp4; codecs="' + cod + '"') : true;
+        return (l.width ? l.width + "x" + l.height : "?") + " " + (cod || "sin códec") + (ok ? "" : " (este navegador no lo soporta)");
+      }).join(" | ");
+      $("diag").textContent = "Formato: " + info;
+      funciono(); video.play().catch(() => {});
+    });
     h.loadSource(fuente);
     h.attachMedia(video);
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
