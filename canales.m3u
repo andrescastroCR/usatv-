@@ -1,15 +1,27 @@
 #EXTM3U
-# Esta es la lista que la página carga automáticamente.
-# Para agregar un canal, copia las dos líneas (#EXTINF y el link) y cambia el nombre, el grupo y la URL.
-#EXTINF:-1 group-title="Deportes",Red Bull TV
-https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8
+# Lista de canales que la pagina carga automaticamente.
+# Para agregar un canal copia las dos lineas (#EXTINF y el link).
 #EXTINF:-1 group-title="Documentaries",Love Nature
 https://pb-ehs1glsha1juy.akamaized.net/Love_Nature_4K.m3u8
-#EXTINF:-1 group-title="News",CBS
-http://191.102.39.254:5000/live/ch91/playlist.m3u8
-#EXTINF:-1 group-title="News",ABC
-http://191.102.39.254:5000/live/ch83/playlist.m3u8
 #EXTINF:-1 group-title="News",BBC
 https://vs-cmaf-push-ww-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_news_channel_hd/hevc_iptv_mse_v0.mpd
-#EXTINF:-1 group-title="News",NBC
-http://191.102.39.254:5000/live/ch92/playlist.m3u8
+#EXTINF:-1 group-title="News",CNN International North America
+https://d2sybdl23b9psq.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-bocx3i7bjz0dg/CNNFAST_GB.m3u8
+#EXTINF:-1 group-title="News",CNN International
+https://d3bp6dwmpbdajl.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-ury0meh5m4nzm/index.m3u8
+#EXTINF:-1 group-title="News",CNN Originals
+https://amg01918-cnnus-amg01918c2-vizio-us-9192.playouts.now.amagi.tv/playlist/amg01918-cnnus-cnnoriginals-vizious/playlist.m3u8
+#EXTINF:-1 group-title="News",CNN Español
+https://amg00803-cnnfast-amg00803c3-lg-es-5477.playouts.now.amagi.tv/playlist.m3u8
+#EXTINF:-1 group-title="News",America's Voice
+https://d2jiqiw4g5lj5k.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/AmericasVoiceChannel-prod/AVSamsung/AVSamsung.m3u8
+#EXTINF:-1 group-title="News",Bloomberg
+https://www.bloomberg.com/media-manifest/streams/us.m3u8
+#EXTINF:-1 group-title="News",NewsMax
+https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8
+#EXTINF:-1 group-title="Entertainment",BUZZR TV
+https://buzzrota-ono.amagi.tv/playlist.m3u8
+#EXTINF:-1 group-title="Sports",Red Bull TV
+https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8
+#EXTINF:-1 group-title="Sports",beIN Sport Xtra
+https://bein-beinxtrasports-firetv.amagi.tv/playlist.m3u8
