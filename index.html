@@ -129,6 +129,7 @@
 /* ============ CONFIGURACIÓN ============ */
 const NOMBRE_APP = "TV+ USA";               // nombre que se ve junto al logo
 const ARCHIVO_CANALES = "canales.m3u";    // lista de canales que se carga sola
+const MOSTRAR_IMPORTAR = false;       // true = muestra de nuevo "Agregar canales (lista M3U)"
 // Se usa solo si no se puede leer canales.m3u (por ejemplo al abrir el archivo con doble clic):
 const RESPALDO = [
   { nombre: "Red Bull TV", url: "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8", grupo: "Deportes" },
@@ -143,6 +144,7 @@ function leer(clave, def) { try { const v = JSON.parse(localStorage.getItem(clav
 function guardar(clave, val) { try { localStorage.setItem(clave, JSON.stringify(val)); } catch (e) {} }
 
 document.title = NOMBRE_APP;
+if (!MOSTRAR_IMPORTAR) { const d = document.querySelector("details"); if (d) d.style.display = "none"; }
 $("marca").textContent = NOMBRE_APP;
 // Si no existe logo.png, se oculta la imagen y queda solo el nombre
 $("logo").onerror = () => { $("logo").style.display = "none"; };
