@@ -1,0 +1,5 @@
+#EXTM3U
+# Esta es la lista que la página carga automáticamente.
+# Para agregar un canal, copia las dos líneas (#EXTINF y el link) y cambia el nombre, el grupo y la URL.
+#EXTINF:-1 group-title="Deportes",Red Bull TV
+https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8
