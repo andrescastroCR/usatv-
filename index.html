@@ -130,6 +130,9 @@
 const NOMBRE_APP = "TV+ USA";               // nombre que se ve junto al logo
 const ARCHIVO_CANALES = "canales.m3u";    // lista de canales que se carga sola
 const MOSTRAR_IMPORTAR = false;       // true = muestra de nuevo "Agregar canales (lista M3U)"
+// Dirección de tu proxy de Cloudflare (ver instrucciones). Déjala vacía "" para no usar proxy.
+// Ejemplo: "https://mi-tv-proxy.tuusuario.workers.dev/"
+const PROXY_URL = "https://usatv-proxy.andrescastro818.workers.dev/";
 // Se usa solo si no se puede leer canales.m3u (por ejemplo al abrir el archivo con doble clic):
 const RESPALDO = [
   { nombre: "Red Bull TV", url: "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8", grupo: "Deportes" },
@@ -249,33 +252,71 @@ function mostrarNombre(txt) {
   clearTimeout(ovlTimer); ovlTimer = setTimeout(() => o.classList.remove("on"), 3000);
 }
 
-function reproducir(c) {
+let usaProxyEnLista = new Set(leer("tv_proxy_urls", []));
+const viaProxy = u => PROXY_URL.replace(/\/?$/, "/") + "?u=" + encodeURIComponent(u);
+const esIP = u => { try { return /^\d{1,3}(\.\d{1,3}){3}$/.test(new URL(u).hostname); } catch (e) { return false; } };
+
+function reproducir(c, forzarProxy) {
   actual = c;
   guardar("tv_ultimo", c.url);
   $("actual").textContent = c.nombre;
   mostrarNombre(c.nombre);
   mostrarAviso("");
+  video.onerror = null;
   if (hls) { hls.destroy(); hls = null; }
 
-  if (location.protocol === "https:" && c.url.startsWith("http://")) {
+  const esHttp = c.url.startsWith("http://");
+  const necesitaHttps = location.protocol === "https:" && esHttp;
+  const proxyDisponible = !!PROXY_URL;
+  const usaProxy = proxyDisponible && (forzarProxy || usaProxyEnLista.has(c.url) || necesitaHttps);
+
+  if (necesitaHttps && !proxyDisponible) {
     mostrarAviso("Este canal usa HTTP y la página está en HTTPS, por eso el navegador lo bloquea.");
     dibujar(); return;
   }
 
+  const fuente = usaProxy ? viaProxy(c.url) : c.url;
+
+  const fallo = detalle => {
+    if (actual !== c) return;
+    if (!usaProxy && proxyDisponible) {
+      mostrarAviso("Reintentando por el proxy...");
+      reproducir(c, true);
+      return;
+    }
+    if (usaProxy && esIP(c.url)) {
+      mostrarAviso("Este canal usa una dirección IP y el proxy de Cloudflare no puede conectarse a esas.");
+    } else if (usaProxy) {
+      mostrarAviso("No se pudo cargar el canal ni con el proxy. Probablemente está caído o bloquea conexiones externas.");
+    } else {
+      mostrarAviso(detalle || "No se pudo cargar el canal. Puede estar caído o el servidor no permite reproducirlo desde una página web (CORS).");
+    }
+  };
+
+  const funciono = () => {
+    if (actual !== c) return;
+    if (usaProxy && !necesitaHttps && forzarProxy && !usaProxyEnLista.has(c.url)) {
+      usaProxyEnLista.add(c.url);
+      guardar("tv_proxy_urls", [...usaProxyEnLista]);
+    }
+  };
+
   if (window.Hls && Hls.isSupported()) {
-    hls = new Hls();
-    hls.on(Hls.Events.ERROR, (_, d) => {
+    const h = new Hls();
+    hls = h;
+    h.on(Hls.Events.ERROR, (_, d) => {
       if (d.fatal) {
-        mostrarAviso(d.type === Hls.ErrorTypes.NETWORK_ERROR
-          ? "No se pudo cargar el canal. Puede estar caído o el servidor no permite reproducirlo desde una página web (CORS)."
-          : "Error al reproducir este canal.");
+        if (d.type === Hls.ErrorTypes.NETWORK_ERROR) fallo();
+        else if (actual === c) mostrarAviso("Error al reproducir este canal.");
       }
     });
-    hls.loadSource(c.url);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    h.on(Hls.Events.MANIFEST_PARSED, () => { funciono(); video.play().catch(() => {}); });
+    h.loadSource(fuente);
+    h.attachMedia(video);
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = c.url;
+    video.onerror = () => fallo();
+    video.onloadedmetadata = funciono;
+    video.src = fuente;
     video.play().catch(() => {});
   } else {
     mostrarAviso("Este navegador no soporta reproducción HLS.");
