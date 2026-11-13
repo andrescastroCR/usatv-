@@ -218,7 +218,7 @@ function dibujar() {
     (!g || (c.grupo || "Otros") === g) &&
     (!soloFav || favoritos.has(c.url))
   );
-  $("cuenta").textContent = visibles.length + " de " + todos().length + " canales";
+  $("cuenta").textContent = visibles.length + " de " + todos().length + " canales · " + (PROXY_URL ? "proxy activo" : "sin proxy");
   if (!visibles.length) {
     const v = document.createElement("div"); v.className = "vacio"; v.textContent = "No hay canales para mostrar"; cont.appendChild(v); return;
   }
@@ -277,19 +277,20 @@ function reproducir(c, forzarProxy) {
 
   const fuente = usaProxy ? viaProxy(c.url) : c.url;
 
-  const fallo = detalle => {
+  const fallo = codigo => {
     if (actual !== c) return;
+    const sufijo = codigo ? " [" + codigo + "]" : "";
     if (!usaProxy && proxyDisponible) {
       mostrarAviso("Reintentando por el proxy...");
       reproducir(c, true);
       return;
     }
     if (usaProxy && esIP(c.url)) {
-      mostrarAviso("Este canal usa una dirección IP y el proxy de Cloudflare no puede conectarse a esas.");
+      mostrarAviso("Este canal usa una dirección IP y el proxy de Cloudflare no puede conectarse a esas." + sufijo);
     } else if (usaProxy) {
-      mostrarAviso("No se pudo cargar el canal ni con el proxy. Probablemente está caído o bloquea conexiones externas.");
+      mostrarAviso("No se pudo cargar el canal ni con el proxy. Probablemente está caído o bloquea conexiones externas." + sufijo);
     } else {
-      mostrarAviso(detalle || "No se pudo cargar el canal. Puede estar caído o el servidor no permite reproducirlo desde una página web (CORS).");
+      mostrarAviso("No se pudo cargar el canal. Puede estar caído o el servidor no permite reproducirlo desde una página web (CORS)." + sufijo);
     }
   };
 
@@ -302,13 +303,14 @@ function reproducir(c, forzarProxy) {
   };
 
   if (window.Hls && Hls.isSupported()) {
-    const h = new Hls();
+    const h = new Hls({ capLevelToPlayerSize: true });
     hls = h;
+    let intentosMedia = 0;
     h.on(Hls.Events.ERROR, (_, d) => {
-      if (d.fatal) {
-        if (d.type === Hls.ErrorTypes.NETWORK_ERROR) fallo();
-        else if (actual === c) mostrarAviso("Error al reproducir este canal.");
-      }
+      if (!d.fatal || actual !== c) return;
+      if (d.type === Hls.ErrorTypes.NETWORK_ERROR) fallo(d.details + (d.response && d.response.code ? " HTTP " + d.response.code : ""));
+      else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && intentosMedia < 2) { intentosMedia++; h.recoverMediaError(); }
+      else mostrarAviso("Error al reproducir este canal. [" + d.details + "]");
     });
     h.on(Hls.Events.MANIFEST_PARSED, () => { funciono(); video.play().catch(() => {}); });
     h.loadSource(fuente);
