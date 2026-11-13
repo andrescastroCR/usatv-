@@ -321,16 +321,25 @@ function reproducir(c, forzarProxy) {
   };
 
   let info = "";
+  const est = { frag: 0, incidencias: [] };
   vigilante = setTimeout(() => {
     if (actual !== c || (!video.paused && video.readyState >= 3)) return;
-    mostrarAviso("El canal no empezó a reproducirse tras 15 segundos." + (info ? " Formato: " + info + "." : "") + (video.error ? " [video " + video.error.code + "]" : ""));
+    const nivel = hls && hls.currentLevel >= 0 && hls.levels && hls.levels[hls.currentLevel]
+      ? hls.levels[hls.currentLevel].width + "x" + hls.levels[hls.currentLevel].height : "?";
+    const tecnico = "ruta " + (usaProxy ? "proxy" : "directa") + ", segmentos cargados " + est.frag +
+      ", nivel " + nivel + ", estado " + video.readyState + "/4" +
+      (est.incidencias.length ? ", incidencias: " + est.incidencias.join(", ") : "");
+    mostrarAviso("El canal no empezó a reproducirse tras 15 segundos. [" + tecnico + "]" + (video.error ? " [video " + video.error.code + "]" : ""));
+    $("diag").textContent = "Formato: " + info + " | " + tecnico;
   }, 15000);
 
   if (window.Hls && Hls.isSupported()) {
     const h = new Hls({ capLevelToPlayerSize: true });
     hls = h;
     let intentosMedia = 0;
+    h.on(Hls.Events.FRAG_LOADED, () => { est.frag++; });
     h.on(Hls.Events.ERROR, (_, d) => {
+      if (actual === c && est.incidencias.length < 4 && !est.incidencias.includes(d.details)) est.incidencias.push(d.details);
       if (!d.fatal || actual !== c) return;
       if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
         const http = d.response && d.response.code ? " HTTP " + d.response.code : "";
